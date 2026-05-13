@@ -6,7 +6,7 @@
 // Patrón try/catch + next(err): Express 4 no captura excepciones de funciones async,
 // así que envolvemos cada controller. En Express 5 esto será automático.
 
-import * as authService from "./auth.service.js";
+import * as authService from "./service.js";
 
 export async function registrar(req, res, next) {
   try {

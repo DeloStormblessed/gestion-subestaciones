@@ -3,8 +3,8 @@
 import { Router } from "express";
 import validate from "../../middleware/validate.js";
 import { verificarToken } from "../../middleware/auth.js";
-import { esquemaRegistro, esquemaLogin } from "./auth.schema.js";
-import * as authController from "./auth.controller.js";
+import { esquemaRegistro, esquemaLogin } from "./schema.js";
+import * as authController from "./controller.js";
 
 const router = Router();
 

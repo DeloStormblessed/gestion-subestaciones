@@ -1,8 +1,8 @@
 // backend/features/usuarios/usuarios.controller.js
 
-import * as usuariosService from "./usuarios.service.js";
+import * as usuariosService from "./service.js";
 import { leerPaginacion, formatearRespuesta } from "../../lib/paginacion.js";
-import { esquemaFiltrosUsuarios } from "./usuarios.schema.js";
+import { esquemaFiltrosUsuarios } from "./schema.js";
 import { EntradaInvalida } from "../../lib/errores.js";
 
 export async function listar(req, res, next) {
