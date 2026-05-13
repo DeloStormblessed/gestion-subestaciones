@@ -17,6 +17,10 @@ import { postOrdenTrabajo } from "./controller.js";
 import { crearOrdenTrabajoSchema } from "./schema.js";
 import { Prohibido } from "../../lib/errores.js";
 
+// En la zona de imports:
+import { asociarEtiquetasAActivo } from "../etiquetas/controller.js";
+import { asociarEtiquetasSchema } from "../etiquetas/schema.js";
+
 const router = Router();
 
 // GET /api/v1/activos -- listado con filtros + paginación. Cualquier rol
@@ -93,4 +97,13 @@ router.post(
   validate(crearOrdenTrabajoSchema),
   autorizarCreacionOT,
   postOrdenTrabajo,
+);
+
+// Junto al resto de rutas:
+router.post(
+  "/:id/etiquetas",
+  verificarToken,
+  requireRol("TECNICO", "ADMIN"),
+  validate(asociarEtiquetasSchema),
+  asociarEtiquetasAActivo,
 );
