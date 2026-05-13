@@ -1,0 +1,24 @@
+# docker-compose.yml — define los servicios externos que necesita el proyecto.
+# Por ahora solo PostgreSQL. El día que metamos n8n para el webhook, se añade aquí
+# como un segundo servicio.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gestion-subestaciones-postgres
+    restart: unless-stopped
+    environment:
+      # Credenciales de la BD. Solo desarrollo local: en producción nunca harías esto.
+      POSTGRES_USER: gmao
+      POSTGRES_PASSWORD: gmao_dev_password
+      POSTGRES_DB: gestion_subestaciones
+    ports:
+      # Expone el puerto 5432 del contenedor en el 5432 de tu máquina.
+      - "5432:5432"
+    volumes:
+      # Persiste los datos en un volumen de Docker. Si paras el contenedor,
+      # los datos siguen ahí. Si haces `docker compose down -v`, se borran.
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

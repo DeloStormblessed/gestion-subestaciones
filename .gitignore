@@ -1,0 +1,22 @@
+# Variables de entorno (secretos, no subir nunca a git)
+.env
+.env.local
+.env.*.local
+
+# Dependencias de Node
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Cobertura de tests
+coverage/
