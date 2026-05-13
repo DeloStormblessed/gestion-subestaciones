@@ -75,10 +75,6 @@ export const filtrosListadoActivosSchema = z.object({
 
 // features/activos/schema.js (ampliación)
 //
-// Añadir al final del archivo, junto a los schemas existentes.
-
-import { z } from "zod";
-
 // Schema para POST /api/v1/activos/:id/ordenes-trabajo (scope §9).
 //
 // La relación tipo <-> resultado es la única validación cruzada:
