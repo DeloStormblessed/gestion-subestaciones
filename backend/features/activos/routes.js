@@ -12,6 +12,11 @@ import { verificarToken, requireRol } from "../../middleware/auth.js";
 import validate from "../../middleware/validate.js";
 import { crearActivoSchema, editarActivoSchema } from "./schema.js";
 
+// Añadir a los imports existentes:
+import { postOrdenTrabajo } from "./controller.js";
+import { crearOrdenTrabajoSchema } from "./schema.js";
+import { Prohibido } from "../../lib/errores.js";
+
 const router = Router();
 
 // GET /api/v1/activos -- listado con filtros + paginación. Cualquier rol
@@ -53,3 +58,39 @@ router.get("/:id/ordenes-trabajo", verificarToken, getHistorialActivo);
 // hasta tener el service correspondiente.
 
 export default router;
+
+// Middleware de autorización híbrida para crear OTs (scope §5 + §9).
+//
+// La regla mezcla rol Y contenido del body, por eso no encaja en
+// requireRol() genérico:
+//   - OPERARIO: solo OTs de tipo INSPECCION.
+//   - TECNICO y ADMIN: cualquier tipo.
+//
+// Va DESPUÉS del validate, así req.body.tipo ya está validado y
+// normalizado por Zod cuando llegamos aquí.
+function autorizarCreacionOT(req, res, next) {
+  const { rol } = req.usuario;
+  const { tipo } = req.body;
+
+  if (rol === "TECNICO" || rol === "ADMIN") {
+    return next();
+  }
+
+  if (rol === "OPERARIO" && tipo === "INSPECCION") {
+    return next();
+  }
+
+  return next(
+    new Prohibido("Los operarios solo pueden registrar OTs de tipo INSPECCION"),
+  );
+}
+
+// features/activos/routes.js (continuación)
+
+router.post(
+  "/:id/ordenes-trabajo",
+  verificarToken,
+  validate(crearOrdenTrabajoSchema),
+  autorizarCreacionOT,
+  postOrdenTrabajo,
+);

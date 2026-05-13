@@ -1,11 +1,39 @@
 // backend/features/activos/activos.test.js
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  vi,
+} from "vitest";
 import request from "supertest";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma.js";
 import app from "../app.js";
+
+// tests/integration/activos.test.js (ampliación)
+//
+// Añadir al inicio del archivo, junto a los imports existentes:
+
+import { notificarWebhook } from "../lib/webhook.js";
+// ↑ Ajusta la ruta a tu estructura real (lib/webhook.js desde tests/integration).
+// Lo correcto es: '../../lib/webhook.js'
+
+// Mock del módulo completo. notificarWebhook pasa a ser un vi.fn().
+// Lo importamos arriba para poder asertar sobre sus llamadas.
+vi.mock("../lib/webhook.js", () => ({
+  notificarWebhook: vi.fn(),
+}));
+
+beforeEach(() => {
+  // Reseteamos el mock antes de cada test: si un test anterior llamó al
+  // webhook, no queremos que contamine las aserciones del siguiente.
+  vi.mocked(notificarWebhook).mockClear();
+});
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-key";
 
@@ -339,5 +367,251 @@ describe("GET /api/v1/activos/:id/ordenes-trabajo", () => {
       .get("/api/v1/activos/inexistente-xyz/ordenes-trabajo")
       .set("Authorization", `Bearer ${tokenOperario}`);
     expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /api/v1/activos/:id/ordenes-trabajo", () => {
+  let activoTestId;
+
+  beforeEach(async () => {
+    // Cada test del bloque parte de un activo limpio EN_SERVICIO,
+    // creado directamente vía Prisma para no depender del endpoint POST /activos.
+    const activo = await prisma.activo.create({
+      data: {
+        codigo: `ACT-TEST-${Date.now()}`,
+        tipo: "TRANSFORMADOR_POTENCIA",
+        fabricante: "TestCorp",
+        fechaPuestaEnServicio: new Date(),
+        estado: "EN_SERVICIO",
+        // Inspección futura: regla B no se activa.
+        fechaProximaInspeccion: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        subestacionId: subestacionId, // creado en beforeAll
+      },
+    });
+    activoTestId = activo.id;
+  });
+
+  describe("autorización por rol", () => {
+    it("401 sin token", async () => {
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .send({ tipo: "INSPECCION", descripcion: "Revisión", resultado: "OK" });
+      expect(res.status).toBe(401);
+    });
+
+    it("OPERARIO puede crear OT de tipo INSPECCION", async () => {
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenOperario}`)
+        .send({
+          tipo: "INSPECCION",
+          descripcion: "Revisión visual",
+          resultado: "OK",
+        });
+      expect(res.status).toBe(201);
+    });
+
+    it("OPERARIO NO puede crear OT de tipo PREVENTIVO (403)", async () => {
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenOperario}`)
+        .send({ tipo: "PREVENTIVO", descripcion: "Mantenimiento anual" });
+      expect(res.status).toBe(403);
+    });
+
+    it("TECNICO puede crear OT de tipo CORRECTIVO", async () => {
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenTecnico}`)
+        .send({ tipo: "CORRECTIVO", descripcion: "Sustitución de fusible" });
+      expect(res.status).toBe(201);
+    });
+  });
+
+  describe("transiciones válidas y efectos colaterales", () => {
+    it("INSPECCION OK: estado no cambia y recalcula fechaProximaInspeccion", async () => {
+      const fechaAntes = (
+        await prisma.activo.findUnique({ where: { id: activoTestId } })
+      ).fechaProximaInspeccion;
+
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenTecnico}`)
+        .send({ tipo: "INSPECCION", descripcion: "OK total", resultado: "OK" });
+
+      expect(res.status).toBe(201);
+      expect(res.body.estadoAnterior).toBe("EN_SERVICIO");
+      expect(res.body.estadoNuevo).toBe("EN_SERVICIO");
+
+      const activoDespues = await prisma.activo.findUnique({
+        where: { id: activoTestId },
+      });
+      expect(activoDespues.estado).toBe("EN_SERVICIO");
+      // La nueva fecha tiene que ser POSTERIOR a la anterior (se ha recalculado).
+      expect(activoDespues.fechaProximaInspeccion.getTime()).toBeGreaterThan(
+        fechaAntes.getTime(),
+      );
+
+      // Webhook NO disparado: INSPECCION OK no es evento crítico.
+      expect(notificarWebhook).not.toHaveBeenCalled();
+    });
+
+    it("INSPECCION AVERIA_DETECTADA: transita a AVERIADO y dispara webhook", async () => {
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenOperario}`)
+        .send({
+          tipo: "INSPECCION",
+          descripcion: "Detectada fuga de aceite",
+          resultado: "AVERIA_DETECTADA",
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.estadoNuevo).toBe("AVERIADO");
+
+      const activoDespues = await prisma.activo.findUnique({
+        where: { id: activoTestId },
+      });
+      expect(activoDespues.estado).toBe("AVERIADO");
+
+      // Webhook disparado con evento correcto.
+      expect(notificarWebhook).toHaveBeenCalledTimes(1);
+      expect(notificarWebhook).toHaveBeenCalledWith(
+        "ot.averia_detectada",
+        expect.objectContaining({
+          activo: expect.objectContaining({ id: activoTestId }),
+          subestacion: expect.any(Object),
+          ordenTrabajo: expect.any(Object),
+        }),
+      );
+    });
+
+    it("CORRECTIVO: transita a FUERA_DE_SERVICIO y dispara webhook", async () => {
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenTecnico}`)
+        .send({ tipo: "CORRECTIVO", descripcion: "Reemplazo de bobina" });
+
+      expect(res.status).toBe(201);
+      expect(res.body.estadoNuevo).toBe("FUERA_DE_SERVICIO");
+
+      expect(notificarWebhook).toHaveBeenCalledTimes(1);
+      expect(notificarWebhook).toHaveBeenCalledWith(
+        "ot.correctivo",
+        expect.any(Object),
+      );
+    });
+
+    it("PREVENTIVO sobre activo con inspección al día: transita a FUERA_DE_SERVICIO", async () => {
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenTecnico}`)
+        .send({ tipo: "PREVENTIVO", descripcion: "Mantenimiento programado" });
+
+      expect(res.status).toBe(201);
+      expect(res.body.estadoNuevo).toBe("FUERA_DE_SERVICIO");
+      // PREVENTIVO no es evento crítico.
+      expect(notificarWebhook).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("reglas de negocio", () => {
+    it("Regla B: rechaza PREVENTIVO si la inspección está vencida (422)", async () => {
+      // Forzamos fechaProximaInspeccion al pasado vía Prisma directo.
+      // Setup de test: saltarse el endpoint normal está justificado aquí.
+      await prisma.activo.update({
+        where: { id: activoTestId },
+        data: {
+          fechaProximaInspeccion: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        },
+      });
+
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenTecnico}`)
+        .send({
+          tipo: "PREVENTIVO",
+          descripcion: "Intento con inspección vencida",
+        });
+
+      expect(res.status).toBe(422);
+      expect(res.body.error).toMatch(/inspección vencida/i);
+
+      // Verificamos que NO se creó OT y NO se llamó al webhook.
+      const otsDelActivo = await prisma.ordenTrabajo.count({
+        where: { activoId: activoTestId },
+      });
+      expect(otsDelActivo).toBe(0);
+      expect(notificarWebhook).not.toHaveBeenCalled();
+    });
+
+    it("Regla A: rechaza PREVENTIVO sobre activo AVERIADO (422)", async () => {
+      await prisma.activo.update({
+        where: { id: activoTestId },
+        data: { estado: "AVERIADO" },
+      });
+
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenTecnico}`)
+        .send({ tipo: "PREVENTIVO", descripcion: "No debería poder" });
+
+      expect(res.status).toBe(422);
+    });
+
+    it("Regla A: rechaza INSTALACION sobre activo EN_SERVICIO (422)", async () => {
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenTecnico}`)
+        .send({
+          tipo: "INSTALACION",
+          descripcion: "Reinstalar activo en servicio",
+        });
+
+      expect(res.status).toBe(422);
+    });
+
+    it("404 si el activo no existe", async () => {
+      const res = await request(app)
+        .post("/api/v1/activos/idquenoexiste/ordenes-trabajo")
+        .set("Authorization", `Bearer ${tokenTecnico}`)
+        .send({ tipo: "INSPECCION", descripcion: "NoExiste", resultado: "OK" });
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("validación de body", () => {
+    it("400 si falta descripcion", async () => {
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenTecnico}`)
+        .send({ tipo: "PREVENTIVO" });
+      expect(res.status).toBe(400);
+    });
+
+    it("400 si INSPECCION sin resultado", async () => {
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenTecnico}`)
+        .send({ tipo: "INSPECCION", descripcion: "Sin resultado" });
+      expect(res.status).toBe(400);
+    });
+
+    it("400 si PREVENTIVO con resultado (campo no aplica)", async () => {
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenTecnico}`)
+        .send({ tipo: "PREVENTIVO", descripcion: "NoExiste", resultado: "OK" });
+      expect(res.status).toBe(400);
+    });
+
+    it("400 si tipo es inválido", async () => {
+      const res = await request(app)
+        .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
+        .set("Authorization", `Bearer ${tokenTecnico}`)
+        .send({ tipo: "TIPO_INEXISTENTE", descripcion: "NoExiste" });
+      expect(res.status).toBe(400);
+    });
   });
 });

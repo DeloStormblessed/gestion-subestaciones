@@ -9,6 +9,7 @@ import {
 } from "./service.js";
 import { filtrosListadoActivosSchema } from "./schema.js";
 import { EntradaInvalida } from "../../lib/errores.js";
+import { registrarOrdenTrabajo } from "./service.js";
 
 export async function getActivos(req, res, next) {
   try {
@@ -78,6 +79,25 @@ export async function getHistorialActivo(req, res, next) {
       resultado.data,
     );
     res.json(respuesta);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/v1/activos/:id/ordenes-trabajo (scope §9).
+//
+// Adaptador HTTP fino: el grueso (reglas A/B, transacción, webhook)
+// vive en el service. Aquí solo extraemos datos del request y mapeamos
+// el resultado a respuesta HTTP.
+export async function postOrdenTrabajo(req, res, next) {
+  try {
+    const ot = await registrarOrdenTrabajo({
+      activoId: req.params.id,
+      autorId: req.usuario.id,
+      datos: req.body, // ya validado por crearOrdenTrabajoSchema
+    });
+
+    res.status(201).json(ot);
   } catch (err) {
     next(err);
   }
