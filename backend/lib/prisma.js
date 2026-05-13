@@ -1,7 +1,10 @@
-// Cliente Prisma como singleton: una sola instancia para toda la app.
-// Crear múltiples PrismaClient agota el pool de conexiones de PostgreSQL.
-import { PrismaClient } from '@prisma/client'
+// backend/lib/prisma.js
 
-const prisma = new PrismaClient()
+import { PrismaClient } from "@prisma/client";
 
-export default prisma
+// Singleton: una única instancia de PrismaClient para toda la app.
+// Importa SIEMPRE desde aquí. No hagas `new PrismaClient()` en otros archivos
+// o multiplicarás conexiones y agotarás el pool de Postgres.
+const prisma = new PrismaClient();
+
+export default prisma;
