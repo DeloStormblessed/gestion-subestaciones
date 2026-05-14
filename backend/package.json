@@ -11,7 +11,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "node prisma/seed.js",
     "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "test:api": "newman run postman/gestion-subestaciones.postman_collection.json -e postman/gestion-subestaciones.postman_environment.json"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -26,6 +27,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "newman": "^6.2.2",
     "prisma": "^5.22.0",
     "supertest": "^7.0.0",
     "vitest": "^2.1.8"

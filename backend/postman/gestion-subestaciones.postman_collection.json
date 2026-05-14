@@ -1,0 +1,954 @@
+{
+  "info": {
+    "_postman_id": "b2c45f30-1e3a-4d77-9c11-5a8b9e6d3e02",
+    "name": "gestion-subestaciones",
+    "description": "Colección de la API GMAO de gestión de subestaciones eléctricas. Carpetas ordenadas para ejecución secuencial en Collection Runner: los logins guardan tokens, las creaciones guardan ids, y el resto reutiliza esas variables. Autorización por endpoint según `requireRol` en cada `routes.js`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Logins de los 3 roles (guardan token en el environment) y registro público de demostración.",
+      "item": [
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('body trae token', () => pm.expect(body).to.have.property('token'));",
+                  "pm.environment.set('tokenAdmin', body.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@gmao.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login Tecnico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('body trae token', () => pm.expect(body).to.have.property('token'));",
+                  "pm.environment.set('tokenTecnico', body.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"tecnico@gmao.com\",\n  \"password\": \"tecnico123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login Operario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('body trae token', () => pm.expect(body).to.have.property('token'));",
+                  "pm.environment.set('tokenOperario', body.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"operario@gmao.com\",\n  \"password\": \"operario123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Registro publico (demo)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('emailDemo', `demo-${Date.now()}@gmao.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('body trae token', () => pm.expect(pm.response.json()).to.have.property('token'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailDemo}}\",\n  \"password\": \"demo12345\",\n  \"nombre\": \"Usuario Demo\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "registro"]
+            }
+          }
+        },
+        {
+          "name": "Perfil (autenticado)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenOperario}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/perfil",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "perfil"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subestaciones",
+      "item": [
+        {
+          "name": "Listar (con paginacion explicita)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('respuesta paginada', () => pm.expect(pm.response.json()).to.have.property('datos'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenOperario}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/subestaciones?pagina=1&limite=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["subestaciones"],
+              "query": [
+                { "key": "pagina", "value": "1" },
+                { "key": "limite", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detalle (primera del listado)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const req = { url: pm.environment.get('baseUrl') + '/subestaciones', method: 'GET', header: { Authorization: 'Bearer ' + pm.environment.get('tokenOperario') } };",
+                  "pm.sendRequest(req, (err, res) => {",
+                  "  if (err) { console.error(err); return; }",
+                  "  const datos = res.json().datos || [];",
+                  "  if (datos.length > 0) pm.variables.set('primeraSubId', datos[0].id);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenOperario}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/subestaciones/{{primeraSubId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["subestaciones", "{{primeraSubId}}"]
+            }
+          }
+        },
+        {
+          "name": "Crear (guarda subestacionId)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suf = String(Date.now()).slice(-6);",
+                  "pm.variables.set('codigoSubDemo', `SE-DEMO-${suf}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('body trae id', () => pm.expect(body).to.have.property('id'));",
+                  "pm.environment.set('subestacionId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"{{codigoSubDemo}}\",\n  \"nombre\": \"Subestacion Demo Postman\",\n  \"ubicacion\": \"Madrid\",\n  \"tensionNominal\": 110\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/subestaciones",
+              "host": ["{{baseUrl}}"],
+              "path": ["subestaciones"]
+            }
+          }
+        },
+        {
+          "name": "Editar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Subestacion Demo Postman (editada)\",\n  \"ubicacion\": \"Madrid Norte\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/subestaciones/{{subestacionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["subestaciones", "{{subestacionId}}"]
+            }
+          }
+        },
+        {
+          "name": "Activar/Desactivar (PATCH /activacion)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activa\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/subestaciones/{{subestacionId}}/activacion",
+              "host": ["{{baseUrl}}"],
+              "path": ["subestaciones", "{{subestacionId}}", "activacion"]
+            }
+          }
+        },
+        {
+          "name": "[demo 403] Operario intenta crear subestacion",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403 (operario no puede crear)', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenOperario}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"SE-DENEGADA\",\n  \"nombre\": \"No deberia crearse\",\n  \"ubicacion\": \"X\",\n  \"tensionNominal\": 66\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/subestaciones",
+              "host": ["{{baseUrl}}"],
+              "path": ["subestaciones"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activos",
+      "item": [
+        {
+          "name": "Listar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('respuesta paginada', () => pm.expect(pm.response.json()).to.have.property('datos'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenOperario}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/activos",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos"]
+            }
+          }
+        },
+        {
+          "name": "Detalle (primero del seed)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const req = { url: pm.environment.get('baseUrl') + '/activos', method: 'GET', header: { Authorization: 'Bearer ' + pm.environment.get('tokenOperario') } };",
+                  "pm.sendRequest(req, (err, res) => {",
+                  "  if (err) { console.error(err); return; }",
+                  "  const datos = res.json().datos || [];",
+                  "  if (datos.length > 0) pm.variables.set('primerActivoId', datos[0].id);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenOperario}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/activos/{{primerActivoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos", "{{primerActivoId}}"]
+            }
+          }
+        },
+        {
+          "name": "Crear (guarda activoId)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suf = String(Date.now()).slice(-8);",
+                  "pm.variables.set('codigoActivoDemo', `T-DEMO-${suf}`);",
+                  "pm.variables.set('serieActivoDemo', `SN-DEMO-${suf}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('body trae id', () => pm.expect(body).to.have.property('id'));",
+                  "pm.environment.set('activoId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenTecnico}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"{{codigoActivoDemo}}\",\n  \"tipo\": \"TRANSFORMADOR_POTENCIA\",\n  \"fabricante\": \"Siemens\",\n  \"modelo\": \"TR-DEMO-110\",\n  \"numeroSerie\": \"{{serieActivoDemo}}\",\n  \"fechaPuestaEnServicio\": \"2026-01-15\",\n  \"subestacionId\": \"{{subestacionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/activos",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos"]
+            }
+          }
+        },
+        {
+          "name": "Editar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenTecnico}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modelo\": \"TR-DEMO-110-rev2\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/activos/{{activoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos", "{{activoId}}"]
+            }
+          }
+        },
+        {
+          "name": "Historial OTs del activo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenOperario}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/activos/{{activoId}}/ordenes-trabajo",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos", "{{activoId}}", "ordenes-trabajo"]
+            }
+          }
+        },
+        {
+          "name": "Registrar OT INSPECCION (operario CONFORME)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenOperario}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"INSPECCION\",\n  \"descripcion\": \"Inspeccion rutinaria desde Postman\",\n  \"resultado\": \"CONFORME\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/activos/{{activoId}}/ordenes-trabajo",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos", "{{activoId}}", "ordenes-trabajo"]
+            }
+          }
+        },
+        {
+          "name": "[demo 403] Operario intenta crear OT PREVENTIVO",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403 (operario solo INSPECCION)', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenOperario}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"PREVENTIVO\",\n  \"descripcion\": \"No deberia poder hacerlo el operario\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/activos/{{activoId}}/ordenes-trabajo",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos", "{{activoId}}", "ordenes-trabajo"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ordenes de Trabajo",
+      "item": [
+        {
+          "name": "Listar globales",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('respuesta paginada', () => pm.expect(pm.response.json()).to.have.property('datos'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenOperario}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/ordenes-trabajo",
+              "host": ["{{baseUrl}}"],
+              "path": ["ordenes-trabajo"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Etiquetas",
+      "item": [
+        {
+          "name": "Listar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('respuesta array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenOperario}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/etiquetas",
+              "host": ["{{baseUrl}}"],
+              "path": ["etiquetas"]
+            }
+          }
+        },
+        {
+          "name": "Crear (guarda etiquetaId)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('nombreEtiquetaDemo', `Demo ${Date.now()}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('body trae id', () => pm.expect(body).to.have.property('id'));",
+                  "pm.environment.set('etiquetaId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenTecnico}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"{{nombreEtiquetaDemo}}\",\n  \"color\": \"#3b82f6\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/etiquetas",
+              "host": ["{{baseUrl}}"],
+              "path": ["etiquetas"]
+            }
+          }
+        },
+        {
+          "name": "Asociar etiqueta al activo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenTecnico}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"etiquetaIds\": [{{etiquetaId}}]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/activos/{{activoId}}/etiquetas",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos", "{{activoId}}", "etiquetas"]
+            }
+          }
+        },
+        {
+          "name": "Desasociar todas las etiquetas del activo (set vacio)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenTecnico}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"etiquetaIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/activos/{{activoId}}/etiquetas",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos", "{{activoId}}", "etiquetas"]
+            }
+          }
+        },
+        {
+          "name": "Borrar etiqueta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/etiquetas/{{etiquetaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["etiquetas", "{{etiquetaId}}"]
+            }
+          }
+        },
+        {
+          "name": "[demo 403] Tecnico intenta borrar etiqueta",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const req = { url: pm.environment.get('baseUrl') + '/etiquetas', method: 'GET', header: { Authorization: 'Bearer ' + pm.environment.get('tokenOperario') } };",
+                  "pm.sendRequest(req, (err, res) => {",
+                  "  if (err) { console.error(err); return; }",
+                  "  const arr = res.json() || [];",
+                  "  if (arr.length > 0) pm.variables.set('cualquierEtiquetaId', arr[0].id);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403 (DELETE etiqueta es ADMIN-only)', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenTecnico}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/etiquetas/{{cualquierEtiquetaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["etiquetas", "{{cualquierEtiquetaId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuarios",
+      "item": [
+        {
+          "name": "Listar (guarda usuarioId con el primero)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('datos es array', () => pm.expect(body.datos).to.be.an('array'));",
+                  "if (body.datos && body.datos.length > 0) pm.environment.set('usuarioId', body.datos[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios",
+              "host": ["{{baseUrl}}"],
+              "path": ["usuarios"]
+            }
+          }
+        },
+        {
+          "name": "Detalle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{usuarioId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["usuarios", "{{usuarioId}}"]
+            }
+          }
+        },
+        {
+          "name": "Cambiar rol",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rol\": \"TECNICO\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{usuarioId}}/rol",
+              "host": ["{{baseUrl}}"],
+              "path": ["usuarios", "{{usuarioId}}", "rol"]
+            }
+          }
+        },
+        {
+          "name": "Activar/Desactivar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activo\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{usuarioId}}/activacion",
+              "host": ["{{baseUrl}}"],
+              "path": ["usuarios", "{{usuarioId}}", "activacion"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "GET dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenOperario}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
