@@ -282,7 +282,7 @@ export async function registrarOrdenTrabajo({ activoId, autorId, datos }) {
     // próxima inspección se reprogramará cuando vuelva a EN_SERVICIO
     // (no es responsabilidad de este endpoint).
     const nuevaFechaInspeccion =
-      tipo === "INSPECCION" && resultado === "OK"
+      tipo === "INSPECCION" && resultado === "CONFORME"
         ? calcularProximaInspeccion(new Date(), activo.tipo)
         : null;
 
@@ -328,7 +328,7 @@ export async function registrarOrdenTrabajo({ activoId, autorId, datos }) {
   // el usuario recibe la respuesta sin esperar a n8n.
   const esCorrectivo = tipo === "CORRECTIVO";
   const esInspeccionConAveria =
-    tipo === "INSPECCION" && resultado === "AVERIA_DETECTADA";
+    tipo === "INSPECCION" && resultado === "NO_CONFORME";
 
   if (esCorrectivo || esInspeccionConAveria) {
     const evento = esCorrectivo ? "ot.correctivo" : "ot.averia_detectada";

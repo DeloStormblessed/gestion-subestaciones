@@ -7,13 +7,13 @@ import { ReglaNegocio } from "../lib/errores.js";
 describe("aplicarTransicion — transiciones válidas (scope §7 regla A)", () => {
   describe("desde EN_SERVICIO", () => {
     it("INSPECCION + OK → EN_SERVICIO (se mantiene en servicio)", () => {
-      expect(aplicarTransicion("EN_SERVICIO", "INSPECCION", "OK")).toBe(
+      expect(aplicarTransicion("EN_SERVICIO", "INSPECCION", "CONFORME")).toBe(
         "EN_SERVICIO",
       );
     });
     it("INSPECCION + AVERIA_DETECTADA → AVERIADO", () => {
       expect(
-        aplicarTransicion("EN_SERVICIO", "INSPECCION", "AVERIA_DETECTADA"),
+        aplicarTransicion("EN_SERVICIO", "INSPECCION", "NO_CONFORME"),
       ).toBe("AVERIADO");
     });
     it("PREVENTIVO → FUERA_DE_SERVICIO", () => {
@@ -35,14 +35,14 @@ describe("aplicarTransicion — transiciones válidas (scope §7 regla A)", () =
     // El resultado de la INSPECCION sobre un averiado no altera el estado:
     // para recuperarlo hace falta una OT de CORRECTIVO.
     it("INSPECCION + OK → AVERIADO (sigue averiado)", () => {
-      expect(aplicarTransicion("AVERIADO", "INSPECCION", "OK")).toBe(
+      expect(aplicarTransicion("AVERIADO", "INSPECCION", "CONFORME")).toBe(
         "AVERIADO",
       );
     });
     it("INSPECCION + AVERIA_DETECTADA → AVERIADO", () => {
-      expect(
-        aplicarTransicion("AVERIADO", "INSPECCION", "AVERIA_DETECTADA"),
-      ).toBe("AVERIADO");
+      expect(aplicarTransicion("AVERIADO", "INSPECCION", "NO_CONFORME")).toBe(
+        "AVERIADO",
+      );
     });
     it("CORRECTIVO → FUERA_DE_SERVICIO (entra a reparación)", () => {
       expect(aplicarTransicion("AVERIADO", "CORRECTIVO")).toBe(
@@ -56,9 +56,9 @@ describe("aplicarTransicion — transiciones válidas (scope §7 regla A)", () =
 
   describe("desde FUERA_DE_SERVICIO", () => {
     it("INSPECCION + OK → FUERA_DE_SERVICIO (la inspección no lo reactiva)", () => {
-      expect(aplicarTransicion("FUERA_DE_SERVICIO", "INSPECCION", "OK")).toBe(
-        "FUERA_DE_SERVICIO",
-      );
+      expect(
+        aplicarTransicion("FUERA_DE_SERVICIO", "INSPECCION", "CONFORME"),
+      ).toBe("FUERA_DE_SERVICIO");
     });
     it("CORRECTIVO → EN_SERVICIO (vuelve al servicio tras reparación)", () => {
       expect(aplicarTransicion("FUERA_DE_SERVICIO", "CORRECTIVO")).toBe(
@@ -108,9 +108,9 @@ describe("aplicarTransicion — transiciones prohibidas (scope §7 regla A)", ()
     );
   });
   it("DADO_DE_BAJA + INSPECCION → ReglaNegocio (no se inspecciona lo dado de baja)", () => {
-    expect(() => aplicarTransicion("DADO_DE_BAJA", "INSPECCION", "OK")).toThrow(
-      ReglaNegocio,
-    );
+    expect(() =>
+      aplicarTransicion("DADO_DE_BAJA", "INSPECCION", "CONFORME"),
+    ).toThrow(ReglaNegocio);
   });
   it("DADO_DE_BAJA + PREVENTIVO → ReglaNegocio", () => {
     expect(() => aplicarTransicion("DADO_DE_BAJA", "PREVENTIVO")).toThrow(

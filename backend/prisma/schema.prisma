@@ -14,30 +14,41 @@ datasource db {
 // ============================================================
 
 enum Rol {
-  OPERARIO   // consulta + registra solo OTs de tipo INSPECCION
-  TECNICO    // + alta/edición de activos, cualquier tipo de OT, etiquetas
-  ADMIN      // + gestión de subestaciones y usuarios
+  OPERARIO
+  TECNICO
+  ADMIN
 }
 
-// Estados del ciclo de vida de un Activo.
-// La matriz de transiciones (Regla A) vive en lib/transiciones.js como función pura,
-// testeable sin BD ni Express. Aquí solo declaramos los valores válidos.
 enum EstadoActivo {
   EN_SERVICIO
   AVERIADO
+  // FUERA_DE_SERVICIO: equivalente a "en descargo" en jerga del sector eléctrico
+  // (procedimiento formal de retirar un equipo con consignación y puesta a tierra).
+  // Se mantiene el término genérico GMAO por claridad para no-eléctricos.
   FUERA_DE_SERVICIO
-  DADO_DE_BAJA   // equivalente a "borrado" para un Activo (no hay DELETE)
+  // DADO_DE_BAJA: equivale al "borrado" para un Activo (no hay DELETE en la API).
+  // Preserva el histórico de OTs asociadas.
+  DADO_DE_BAJA
 }
 
+// Tipos de activo del proyecto. La codificación de los `Activo.codigo` (campo del modelo)
+// sigue la norma IEC 81346-2 (designación de referencia) con un ajuste pragmático
+// para el transformador de medida. Detalle en seed.js y README.
 enum TipoActivo {
   TRANSFORMADOR_POTENCIA
   INTERRUPTOR_AUTOMATICO
   SECCIONADOR
+  // PARARRAYOS: técnicamente "descargador de sobretensión" según UNE-EN 60099.
+  // Se mantiene "pararrayos" por ser el término más reconocible y aceptado por la norma.
   PARARRAYOS
   TRANSFORMADOR_MEDIDA
   BATERIA_CONDENSADORES
 }
 
+// Tipos de orden de trabajo. INSPECCION, PREVENTIVO y CORRECTIVO siguen la
+// terminología de la norma UNE-EN 13306 (Terminología del mantenimiento).
+// INSTALACION y BAJA son operaciones de ciclo de vida del activo (no mantenimiento estricto),
+// pero se modelan como OT para mantener trazabilidad histórica unificada.
 enum TipoOrdenTrabajo {
   INSPECCION
   PREVENTIVO
@@ -46,11 +57,13 @@ enum TipoOrdenTrabajo {
   BAJA
 }
 
-// Solo se rellena cuando la OT es de tipo INSPECCION.
-// Si vale AVERIA_DETECTADA: el activo transita a AVERIADO y se dispara webhook a n8n.
+// Resultado de una inspección según UNE-EN 13306 §4.4 (Conformidad).
+// CONFORME    = el activo cumple las condiciones requeridas tras la inspección.
+// NO_CONFORME = se ha detectado avería o desviación. Dispara webhook (lib/webhook.js)
+//               y transición a AVERIADO en la Regla A (lib/transiciones.js).
 enum ResultadoInspeccion {
-  OK
-  AVERIA_DETECTADA
+  CONFORME
+  NO_CONFORME
 }
 
 // ============================================================

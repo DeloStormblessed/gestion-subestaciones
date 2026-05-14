@@ -97,7 +97,7 @@ beforeAll(async () => {
     data: {
       tipo: "INSPECCION",
       descripcion: "Insp enero",
-      resultado: "OK",
+      resultado: "CONFORME",
       estadoAnterior: "EN_SERVICIO",
       estadoNuevo: "EN_SERVICIO",
       fechaIntervencion: new Date("2026-01-15T10:00:00Z"),

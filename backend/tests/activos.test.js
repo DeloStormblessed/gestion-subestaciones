@@ -387,7 +387,11 @@ describe("POST /api/v1/activos/:id/ordenes-trabajo", () => {
     it("401 sin token", async () => {
       const res = await request(app)
         .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
-        .send({ tipo: "INSPECCION", descripcion: "Revisión", resultado: "OK" });
+        .send({
+          tipo: "INSPECCION",
+          descripcion: "Revisión",
+          resultado: "CONFORME",
+        });
       expect(res.status).toBe(401);
     });
 
@@ -398,7 +402,7 @@ describe("POST /api/v1/activos/:id/ordenes-trabajo", () => {
         .send({
           tipo: "INSPECCION",
           descripcion: "Revisión visual",
-          resultado: "OK",
+          resultado: "CONFORME",
         });
       expect(res.status).toBe(201);
     });
@@ -429,7 +433,11 @@ describe("POST /api/v1/activos/:id/ordenes-trabajo", () => {
       const res = await request(app)
         .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
         .set("Authorization", `Bearer ${tokenTecnico}`)
-        .send({ tipo: "INSPECCION", descripcion: "OK total", resultado: "OK" });
+        .send({
+          tipo: "INSPECCION",
+          descripcion: "OK total",
+          resultado: "CONFORME",
+        });
 
       expect(res.status).toBe(201);
       expect(res.body.estadoAnterior).toBe("EN_SERVICIO");
@@ -455,7 +463,7 @@ describe("POST /api/v1/activos/:id/ordenes-trabajo", () => {
         .send({
           tipo: "INSPECCION",
           descripcion: "Detectada fuga de aceite",
-          resultado: "AVERIA_DETECTADA",
+          resultado: "NO_CONFORME",
         });
 
       expect(res.status).toBe(201);
@@ -567,7 +575,11 @@ describe("POST /api/v1/activos/:id/ordenes-trabajo", () => {
       const res = await request(app)
         .post("/api/v1/activos/idquenoexiste/ordenes-trabajo")
         .set("Authorization", `Bearer ${tokenTecnico}`)
-        .send({ tipo: "INSPECCION", descripcion: "NoExiste", resultado: "OK" });
+        .send({
+          tipo: "INSPECCION",
+          descripcion: "NoExiste",
+          resultado: "CONFORME",
+        });
 
       expect(res.status).toBe(404);
     });
@@ -594,7 +606,11 @@ describe("POST /api/v1/activos/:id/ordenes-trabajo", () => {
       const res = await request(app)
         .post(`/api/v1/activos/${activoTestId}/ordenes-trabajo`)
         .set("Authorization", `Bearer ${tokenTecnico}`)
-        .send({ tipo: "PREVENTIVO", descripcion: "NoExiste", resultado: "OK" });
+        .send({
+          tipo: "PREVENTIVO",
+          descripcion: "NoExiste",
+          resultado: "CONFORME",
+        });
       expect(res.status).toBe(400);
     });
 

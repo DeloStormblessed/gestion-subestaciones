@@ -134,8 +134,12 @@ beforeAll(async () => {
       },
     });
 
-  await crearOT(activoEnServicioId, "INSPECCION", -1, { resultado: "OK" });
-  await crearOT(activoEnServicioId, "INSPECCION", -2, { resultado: "OK" });
+  await crearOT(activoEnServicioId, "INSPECCION", -1, {
+    resultado: "CONFORME",
+  });
+  await crearOT(activoEnServicioId, "INSPECCION", -2, {
+    resultado: "CONFORME",
+  });
   await crearOT(activoEnServicioId, "PREVENTIVO", -3);
   await crearOT(activoEnServicioId, "CORRECTIVO", -4);
   await crearOT(activoEnServicioId, "INSTALACION", -5);

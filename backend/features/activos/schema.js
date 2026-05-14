@@ -96,7 +96,7 @@ export const crearOrdenTrabajoSchema = z
       .string()
       .min(3, "La descripción debe tener al menos 3 caracteres")
       .max(1000, "La descripción no puede superar los 1000 caracteres"),
-    resultado: z.enum(["OK", "AVERIA_DETECTADA"]).optional(),
+    resultado: z.enum(["CONFORME", "NO_CONFORME"]).optional(),
     // Opcional: si no viene, Prisma usa @default(now()).
     // Coerce permite recibir string ISO desde JSON y convertirlo a Date.
     fechaIntervencion: z.coerce.date().optional(),

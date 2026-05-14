@@ -65,8 +65,8 @@ export function aplicarTransicion(estadoActual, tipoOT, resultadoInspeccion) {
   // veredicto no tiene sentido semántico ni se puede asentar en el histórico.
   if (tipoOT === "INSPECCION") {
     if (
-      resultadoInspeccion !== "OK" &&
-      resultadoInspeccion !== "AVERIA_DETECTADA"
+      resultadoInspeccion !== "CONFORME" &&
+      resultadoInspeccion !== "NO_CONFORME"
     ) {
       throw new ReglaNegocio(
         "Una OT de tipo INSPECCION requiere indicar resultadoInspeccion (OK o AVERIA_DETECTADA)",
@@ -74,7 +74,7 @@ export function aplicarTransicion(estadoActual, tipoOT, resultadoInspeccion) {
     }
     // El único estado donde el resultado modifica la transición:
     if (estadoActual === "EN_SERVICIO") {
-      return resultadoInspeccion === "OK" ? "EN_SERVICIO" : "AVERIADO";
+      return resultadoInspeccion === "CONFORME" ? "EN_SERVICIO" : "AVERIADO";
     }
     // Para AVERIADO y FUERA_DE_SERVICIO la INSPECCION es no-op; para DADO_DE_BAJA
     // está prohibida. Ambos casos los resuelve la matriz unas líneas más abajo.
