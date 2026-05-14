@@ -9,25 +9,18 @@ import request from "supertest";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma.js";
 import app from "../app.js";
-
-process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-auth";
+import { limpiarBD } from "./lib/limpiar-bd.js";
 
 beforeAll(async () => {
-  await prisma.ordenTrabajo.deleteMany();
-  await prisma.activo.deleteMany();
-  await prisma.etiqueta.deleteMany();
-  await prisma.subestacion.deleteMany();
-  await prisma.usuario.deleteMany();
+  await limpiarBD();
 });
 
 afterAll(async () => {
-  await prisma.ordenTrabajo.deleteMany();
-  await prisma.activo.deleteMany();
-  await prisma.etiqueta.deleteMany();
-  await prisma.subestacion.deleteMany();
-  await prisma.usuario.deleteMany();
+  await limpiarBD();
   await prisma.$disconnect();
 });
+
+process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-auth";
 
 describe("POST /api/v1/auth/registro", () => {
   it("registra un nuevo usuario con rol OPERARIO por defecto", async () => {

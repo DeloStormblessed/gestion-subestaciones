@@ -45,6 +45,10 @@ export const editarActivoSchema = z
   .object({
     fabricante: z.string().min(2).max(100).optional(),
     modelo: z.string().max(100).nullable().optional(),
+    // numeroSerie es @unique en BD: si el cliente lo cambia a uno existente,
+    // Prisma lanza P2002 y el errorHandler lo convierte en Conflicto 409.
+    // .nullable() permite vaciarlo si se grabó por error (campo opcional en modelo).
+    numeroSerie: z.string().max(100).nullable().optional(),
   })
   .refine((datos) => Object.keys(datos).length > 0, {
     message: "Debe proporcionar al menos un campo a editar",

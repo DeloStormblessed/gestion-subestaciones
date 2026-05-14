@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma.js";
 import app from "../app.js";
+import { limpiarBD } from "./lib/limpiar-bd.js";
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-usuarios";
 
@@ -17,12 +18,7 @@ const firmar = (id, rol) =>
   jwt.sign({ id, email: `${id}@test.com`, rol }, process.env.JWT_SECRET);
 
 beforeAll(async () => {
-  // Limpieza completa en orden de FKs.
-  await prisma.ordenTrabajo.deleteMany();
-  await prisma.activo.deleteMany();
-  await prisma.etiqueta.deleteMany();
-  await prisma.subestacion.deleteMany();
-  await prisma.usuario.deleteMany();
+  await limpiarBD();
 
   const hash = await bcrypt.hash("password123", 10);
 
@@ -71,7 +67,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.usuario.deleteMany();
+  await limpiarBD();
   await prisma.$disconnect();
 });
 

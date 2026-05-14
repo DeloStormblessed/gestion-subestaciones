@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma.js";
 import app from "../app.js";
+import { limpiarBD } from "./lib/limpiar-bd.js";
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-key";
 
@@ -11,12 +12,7 @@ let tokenOperario, tokenTecnico, tokenAdmin;
 let subestacion, activo;
 
 beforeAll(async () => {
-  // Limpieza completa en orden de FKs.
-  await prisma.ordenTrabajo.deleteMany();
-  await prisma.activo.deleteMany();
-  await prisma.subestacion.deleteMany();
-  await prisma.usuario.deleteMany();
-  await prisma.etiqueta.deleteMany();
+  await limpiarBD();
 
   const hash = await bcrypt.hash("password123", 10);
   const operario = await prisma.usuario.create({
@@ -90,11 +86,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await prisma.ordenTrabajo.deleteMany();
-  await prisma.activo.deleteMany();
-  await prisma.subestacion.deleteMany();
-  await prisma.usuario.deleteMany();
-  await prisma.etiqueta.deleteMany();
+  await limpiarBD();
   await prisma.$disconnect();
 });
 

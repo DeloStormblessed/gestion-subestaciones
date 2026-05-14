@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma.js";
 import app from "../app.js";
+import { limpiarBD } from "./lib/limpiar-bd.js";
 
 // Tokens precomputados para cada rol, generados en beforeAll. Evita hacer login en cada test.
 let tokenOperario;
@@ -19,12 +20,7 @@ let subestacionBaseId;
 let subestacionConActivoId;
 
 beforeAll(async () => {
-  // Limpieza completa en orden de FKs (mismo patrón que en auth/usuarios.test.js).
-  await prisma.ordenTrabajo.deleteMany();
-  await prisma.activo.deleteMany();
-  await prisma.etiqueta.deleteMany();
-  await prisma.subestacion.deleteMany();
-  await prisma.usuario.deleteMany();
+  await limpiarBD();
 
   // Tres usuarios, uno por rol. Password compartido porque solo necesitamos los JWT.
   const passwordHash = await bcrypt.hash("password123", 10);
@@ -101,13 +97,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Mismo patrón que en usuarios.test.js: solo borramos usuarios al final.
-  // Los activos/subestaciones quedan limpios porque cada test usa sus propios datos.
-  // De todas formas limpiamos en cascada por las FKs onDelete:Restrict.
-  await prisma.ordenTrabajo.deleteMany();
-  await prisma.activo.deleteMany();
-  await prisma.subestacion.deleteMany();
-  await prisma.usuario.deleteMany();
+  await limpiarBD();
   await prisma.$disconnect();
 });
 

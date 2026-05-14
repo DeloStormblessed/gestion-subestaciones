@@ -14,6 +14,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma.js";
 import app from "../app.js";
+import { limpiarBD } from "./lib/limpiar-bd.js";
 
 // tests/integration/activos.test.js (ampliación)
 //
@@ -42,13 +43,7 @@ let subestacionId, otraSubestacionId;
 let activoExistenteId;
 
 beforeAll(async () => {
-  // Orden de limpieza respetando FKs: OTs -> activos -> subestaciones ->
-  // usuarios. El pendiente apuntado de homogeneizar esto se aborda al final
-  // del proyecto; de momento mantenemos el patrón explícito por suite.
-  await prisma.ordenTrabajo.deleteMany();
-  await prisma.activo.deleteMany();
-  await prisma.subestacion.deleteMany();
-  await prisma.usuario.deleteMany();
+  await limpiarBD();
 
   const hash = await bcrypt.hash("password123", 10);
 
@@ -138,10 +133,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.ordenTrabajo.deleteMany();
-  await prisma.activo.deleteMany();
-  await prisma.subestacion.deleteMany();
-  await prisma.usuario.deleteMany();
+  await limpiarBD();
   await prisma.$disconnect();
 });
 
@@ -614,4 +606,59 @@ describe("POST /api/v1/activos/:id/ordenes-trabajo", () => {
       expect(res.status).toBe(400);
     });
   });
+});
+
+// AÑADIR dentro del describe('PUT /api/v1/activos/:id', ...) en tests/activos.test.js
+// Ajustado a los nombres reales del setup: tokenTecnico, subestacionId, activoExistenteId.
+
+it("TECNICO puede editar numeroSerie", async () => {
+  const res = await request(app)
+    .put(`/api/v1/activos/${activoExistenteId}`)
+    .set("Authorization", `Bearer ${tokenTecnico}`)
+    .send({ numeroSerie: "SN-12345-NUEVO" });
+
+  expect(res.status).toBe(200);
+  expect(res.body.numeroSerie).toBe("SN-12345-NUEVO");
+});
+
+it("numeroSerie se puede poner a null para vaciarlo", async () => {
+  // Primero le ponemos un valor para que el null sea un cambio real.
+  await request(app)
+    .put(`/api/v1/activos/${activoExistenteId}`)
+    .set("Authorization", `Bearer ${tokenTecnico}`)
+    .send({ numeroSerie: "SN-A-BORRAR" });
+
+  const res = await request(app)
+    .put(`/api/v1/activos/${activoExistenteId}`)
+    .set("Authorization", `Bearer ${tokenTecnico}`)
+    .send({ numeroSerie: null });
+
+  expect(res.status).toBe(200);
+  expect(res.body.numeroSerie).toBeNull();
+});
+
+it("devuelve 409 si numeroSerie ya existe en otro activo", async () => {
+  // Creamos un segundo activo con un numeroSerie conocido.
+  const otroActivo = await prisma.activo.create({
+    data: {
+      codigo: "ACT-DUP-TEST",
+      tipo: "SECCIONADOR",
+      fabricante: "F",
+      numeroSerie: "SN-OCUPADO",
+      fechaPuestaEnServicio: new Date("2024-01-01"),
+      fechaProximaInspeccion: new Date("2027-01-01"),
+      subestacionId: subestacionId,
+    },
+  });
+
+  // Intentamos asignar al activo principal el numeroSerie del otro.
+  const res = await request(app)
+    .put(`/api/v1/activos/${activoExistenteId}`)
+    .set("Authorization", `Bearer ${tokenTecnico}`)
+    .send({ numeroSerie: "SN-OCUPADO" });
+
+  expect(res.status).toBe(409);
+
+  // Limpieza: borramos el activo extra para no contaminar otros tests.
+  await prisma.activo.delete({ where: { id: otroActivo.id } });
 });
