@@ -7,6 +7,384 @@
   },
   "item": [
     {
+      "name": "★ DEMO 4min",
+      "description": "Demo de presentación de 4 minutos. Ejecutar en orden de arriba a abajo.\n\nPrerequisitos (fuera de los 4 min):\n  docker compose up -d\n  npm run dev\n  node prisma/seed.js\n\nFlujo: auth → subestaciones seed → ciclo de vida completo de activo (INSTALACION→INSPECCION NO_CONFORME→CORRECTIVO×2) → demo 403 por rol → etiquetas → dashboard.",
+      "item": [
+        {
+          "name": "01 · Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK + token JWT', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.property('token');",
+                  "});",
+                  "pm.environment.set('tokenAdmin', pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@gmao.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "02 · Listar subestaciones [datos del seed]",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK + estructura paginada', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.all.keys('datos', 'paginacion');",
+                  "});",
+                  "const datos = pm.response.json().datos || [];",
+                  "if (datos.length > 0) pm.environment.set('demoSubId', datos[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/subestaciones?limite=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["subestaciones"],
+              "query": [{ "key": "limite", "value": "5" }]
+            }
+          }
+        },
+        {
+          "name": "03 · Crear activo [OT INSTALACION automática → EN_SERVICIO]",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('demoCodigoActivo', 'T-DEMO-' + String(Date.now()).slice(-8));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created + estado EN_SERVICIO', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(pm.response.json().estado).to.eql('EN_SERVICIO');",
+                  "});",
+                  "pm.environment.set('demoActivoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"{{demoCodigoActivo}}\",\n  \"tipo\": \"TRANSFORMADOR_POTENCIA\",\n  \"fabricante\": \"ABB\",\n  \"modelo\": \"TRAFO-220kV\",\n  \"fechaPuestaEnServicio\": \"2024-01-15\",\n  \"subestacionId\": \"{{demoSubId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/activos",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos"]
+            }
+          }
+        },
+        {
+          "name": "04 · OT INSPECCION NO_CONFORME [EN_SERVICIO → AVERIADO]",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 + transición EN_SERVICIO → AVERIADO', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  const ot = pm.response.json();",
+                  "  pm.expect(ot.estadoAnterior).to.eql('EN_SERVICIO');",
+                  "  pm.expect(ot.estadoNuevo).to.eql('AVERIADO');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"INSPECCION\",\n  \"descripcion\": \"Inspección periódica. Se detectan anomalías en el devanado primario.\",\n  \"resultado\": \"NO_CONFORME\",\n  \"fechaIntervencion\": \"2025-03-10\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/activos/{{demoActivoId}}/ordenes-trabajo",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos", "{{demoActivoId}}", "ordenes-trabajo"]
+            }
+          }
+        },
+        {
+          "name": "05 · OT CORRECTIVO [AVERIADO → FUERA_DE_SERVICIO]",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 + transición AVERIADO → FUERA_DE_SERVICIO', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  const ot = pm.response.json();",
+                  "  pm.expect(ot.estadoAnterior).to.eql('AVERIADO');",
+                  "  pm.expect(ot.estadoNuevo).to.eql('FUERA_DE_SERVICIO');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"CORRECTIVO\",\n  \"descripcion\": \"Inicio de reparación del devanado primario. Activo retirado del servicio.\",\n  \"fechaIntervencion\": \"2025-03-12\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/activos/{{demoActivoId}}/ordenes-trabajo",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos", "{{demoActivoId}}", "ordenes-trabajo"]
+            }
+          }
+        },
+        {
+          "name": "06 · OT CORRECTIVO [FUERA_DE_SERVICIO → EN_SERVICIO]",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 + transición FUERA_DE_SERVICIO → EN_SERVICIO (reparado)', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  const ot = pm.response.json();",
+                  "  pm.expect(ot.estadoAnterior).to.eql('FUERA_DE_SERVICIO');",
+                  "  pm.expect(ot.estadoNuevo).to.eql('EN_SERVICIO');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"CORRECTIVO\",\n  \"descripcion\": \"Reparación completada. Devanado reemplazado y pruebas superadas. Activo devuelto al servicio.\",\n  \"fechaIntervencion\": \"2025-03-20\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/activos/{{demoActivoId}}/ordenes-trabajo",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos", "{{demoActivoId}}", "ordenes-trabajo"]
+            }
+          }
+        },
+        {
+          "name": "07 · Login Operario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK + token', () => pm.response.to.have.status(200));",
+                  "pm.environment.set('tokenOperario', pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"operario@gmao.com\",\n  \"password\": \"operario123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "08 · [demo 403] Operario intenta OT PREVENTIVO",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden — operarios solo pueden registrar INSPECCION', () => {",
+                  "  pm.response.to.have.status(403);",
+                  "  pm.expect(pm.response.json().error).to.include('INSPECCION');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenOperario}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"PREVENTIVO\",\n  \"descripcion\": \"No debería poder registrar esto un operario.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/activos/{{demoActivoId}}/ordenes-trabajo",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos", "{{demoActivoId}}", "ordenes-trabajo"]
+            }
+          }
+        },
+        {
+          "name": "09a · Crear etiqueta 'Alta Tensión'",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('demoNombreEtiqueta', 'Alta Tensión ' + String(Date.now()).slice(-4));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('demoEtiquetaId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"{{demoNombreEtiqueta}}\",\n  \"color\": \"#FF5733\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/etiquetas",
+              "host": ["{{baseUrl}}"],
+              "path": ["etiquetas"]
+            }
+          }
+        },
+        {
+          "name": "09b · Asociar etiqueta al activo [semántica set N:M]",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK + etiqueta visible en activo', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const etiquetas = pm.response.json().etiquetas || [];",
+                  "  pm.expect(etiquetas.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"etiquetaIds\": [{{demoEtiquetaId}}]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/activos/{{demoActivoId}}/etiquetas",
+              "host": ["{{baseUrl}}"],
+              "path": ["activos", "{{demoActivoId}}", "etiquetas"]
+            }
+          }
+        },
+        {
+          "name": "10 · Dashboard [KPIs globales]",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK + métricas completas', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d).to.have.property('activosPorEstado');",
+                  "  pm.expect(d).to.have.property('otsUltimos30DiasPorTipo');",
+                  "  pm.expect(d).to.have.property('inspeccionesVencidas');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard"]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Auth",
       "description": "Logins de los 3 roles (guardan token en el environment) y registro público de demostración.",
       "item": [
