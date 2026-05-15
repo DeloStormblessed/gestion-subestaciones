@@ -20,3 +20,5 @@ Thumbs.db
 
 # Cobertura de tests
 coverage/
+
+.claude/worktrees/heuristic-cartwright-2030ec
