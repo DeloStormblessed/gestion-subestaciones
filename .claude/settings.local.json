@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell(ls \"c:\\\\Users\\\\javie\\\\OneDrive\\\\Ironhack\\\\BACKEND_PROJECT\\\\gestion-subestaciones\\\\backend\\\\features\\\\\" | Where-Object {$_.PSIsContainer})"
-    ]
-  }
-}
