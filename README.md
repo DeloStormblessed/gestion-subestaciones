@@ -1,80 +1,40 @@
 # gestion-subestaciones
 
-Mini-GMAO de subestaciones eléctricas. API REST para gestionar el mantenimiento de activos eléctricos: transformadores, interruptores, seccionadores, pararrayos y baterías de condensadores. Inspirado en SAP PM e IBM Maximo, simplificado al núcleo esencial.
+Mini-GMAO (Gestión del Mantenimiento Asistido por Ordenador) de subestaciones eléctricas. API REST para llevar inventario y ciclo de vida de mantenimiento de transformadores, interruptores automáticos, seccionadores, pararrayos y baterías de condensadores. Inspirado en SAP PM e IBM Maximo, reducido al núcleo de dominio.
 
-## 1. Stack
+Solo backend. Frontend, refresh tokens y CI/CD quedan explícitamente fuera del scope actual (ver [Roadmap](#roadmap)).
+
+## Stack
 
 | Capa | Tecnología |
-|---|---|
-| Runtime | Node.js 18+ (módulos ESM) |
-| Framework HTTP | Express 4 |
+| --- | --- |
+| Runtime | Node.js 18+ (ESM puro) |
+| HTTP | Express 4 |
 | ORM | Prisma 5 |
-| Base de datos | PostgreSQL 16 (en Docker) |
-| Autenticación | JSON Web Tokens (`jsonwebtoken`) + `bcryptjs` |
+| BD | PostgreSQL 16 (Docker) |
+| Auth | JWT (`jsonwebtoken`) + `bcryptjs` |
 | Validación | Zod |
-| Tests unidad/integración | Vitest + Supertest |
-| Tests end-to-end | Newman (Postman CLI) |
+| Tests | Vitest + Supertest (unidad/integración) · Newman + Postman (E2E) |
 
-## 2. Estructura del proyecto
+## Arranque rápido
 
-Arquitectura **feature-based con capa de servicios**: una carpeta por dominio dentro de `backend/features/`, cada una con `controller.js` (adaptador HTTP delgado), `service.js` (lógica de negocio), `routes.js` (montaje de rutas y middleware) y `schema.js` (validación Zod).
-
-```
-gestion-subestaciones/
-├── docker-compose.yml              # Postgres en local
-├── backend/
-│   ├── app.js                      # Composición de Express y montaje de routers
-│   ├── server.js                   # Entry point (arranca app.listen)
-│   ├── features/
-│   │   ├── auth/                   # registro, login, perfil
-│   │   ├── usuarios/               # CRUD de usuarios (ADMIN-only)
-│   │   ├── subestaciones/          # CRUD de subestaciones
-│   │   ├── activos/                # CRUD activos + OTs anidadas + etiquetas
-│   │   ├── ordenes-trabajo/        # listado global de OTs
-│   │   ├── etiquetas/              # CRUD de etiquetas
-│   │   └── dashboard/              # KPIs agregados
-│   ├── middleware/                 # auth (verificarToken, requireRol), validate, errorHandler
-│   ├── lib/                        # prisma client, paginación, transiciones, webhook, etc.
-│   ├── prisma/
-│   │   ├── schema.prisma           # Modelos, enums y relaciones
-│   │   ├── migrations/             # Historial de migraciones
-│   │   └── seed.js                 # Datos de demostración
-│   ├── tests/                      # Suite Vitest + Supertest
-│   └── postman/                    # Colección y environment para Newman
-```
-
-## 3. Puesta en marcha
-
-Asume Node 18+ y Docker instalados.
+Requisitos: Node 18+ y Docker.
 
 ```bash
-# 1. Clonar el repositorio
-git clone <url> gestion-subestaciones
+git clone <repo> gestion-subestaciones
 cd gestion-subestaciones
 
-# 2. Levantar PostgreSQL (desde la raíz, donde vive docker-compose.yml)
-docker compose up -d
+docker compose up -d                          # PostgreSQL en :5432
 
-# 3. Instalar dependencias del backend
 cd backend
 npm install
-
-# 4. Configurar variables de entorno (los valores por defecto funcionan en local)
-cp .env.example .env
-
-# 5. Aplicar migraciones a la BD
+cp .env.example .env                          # valores por defecto OK para local
 npx prisma migrate deploy
-
-# 6. Sembrar datos de demostración
-node prisma/seed.js
-
-# 7. Arrancar el servidor en modo desarrollo
-npm run dev
+node prisma/seed.js                           # 5 usuarios, 4 subestaciones, 18 activos, ~25 OTs
+npm run dev                                   # API en http://localhost:3000/api/v1
 ```
 
-La API queda escuchando en `http://localhost:3000/api/v1`.
-
-Comprobación rápida:
+Verificación rápida:
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/auth/login \
@@ -82,199 +42,226 @@ curl -X POST http://localhost:3000/api/v1/auth/login \
   -d '{"email":"admin@gmao.com","password":"admin123"}'
 ```
 
-## 4. Variables de entorno
+### Credenciales demo
 
-Definidas en `backend/.env.example`. Cópialo a `backend/.env` y ajusta si hace falta.
+Solo desarrollo. **No reutilizar en producción.**
 
-| Variable | Descripción | Valor por defecto (desarrollo) |
-|---|---|---|
-| `DATABASE_URL` | Cadena de conexión PostgreSQL (formato Prisma) | `postgresql://gmao:gmao_dev_password@localhost:5432/gestion_subestaciones` |
-| `JWT_SECRET` | Secreto para firmar tokens JWT | `cambia-esto-en-produccion-con-un-valor-aleatorio-largo` |
-| `PORT` | Puerto HTTP del servidor | `3000` |
-| `WEBHOOK_URL` | URL del webhook de n8n para notificar averías y correctivos | `""` (vacío = no se dispara) |
+| Email | Password | Rol |
+| --- | --- | --- |
+| `admin@gmao.com` | `admin123` | ADMIN |
+| `tecnico@gmao.com` · `tecnico2@gmao.com` | `tecnico123` | TECNICO |
+| `operario@gmao.com` · `operario2@gmao.com` | `operario123` | OPERARIO |
 
-## 5. Usuarios de demostración
+### Variables de entorno
 
-Tras ejecutar `node prisma/seed.js`, la BD contiene cinco usuarios. Estas credenciales son **solo para desarrollo y demostración**; no deben reutilizarse en producción.
+| Variable | Defecto | Notas |
+| --- | --- | --- |
+| `DATABASE_URL` | `postgresql://gmao:gmao_dev_password@localhost:5432/gestion_subestaciones` | Coincide con `docker-compose.yml` |
+| `JWT_SECRET` | (placeholder) | Cambiar a un valor aleatorio largo en producción |
+| `PORT` | `3000` | — |
+| `WEBHOOK_URL` | `""` | Vacío = no se notifica a n8n (modo dev) |
 
-| Email | Contraseña | Rol | Nombre |
-|---|---|---|---|
-| `admin@gmao.com` | `admin123` | ADMIN | Ana Administradora |
-| `tecnico@gmao.com` | `tecnico123` | TECNICO | Tomás Técnico |
-| `tecnico2@gmao.com` | `tecnico123` | TECNICO | Teresa Técnica |
-| `operario@gmao.com` | `operario123` | OPERARIO | Óscar Operario |
-| `operario2@gmao.com` | `operario123` | OPERARIO | Olivia Operaria |
+## Estructura
 
-## 6. Endpoints
+Arquitectura **feature-based** con servicios puros. Una carpeta por dominio, mismo patrón de cuatro archivos en cada una:
 
-Todos cuelgan del prefijo `/api/v1`. Salvo registro y login, requieren cabecera `Authorization: Bearer <token>`. La autorización por rol se aplica en cada `routes.js` con `requireRol(...)`.
-
-### Auth (`/api/v1/auth`)
-
-| Método | Ruta | Descripción | Acceso |
-|---|---|---|---|
-| POST | `/registro` | Alta pública (siempre crea con rol OPERARIO) | público |
-| POST | `/login` | Devuelve `{ usuario, token }` | público |
-| GET | `/perfil` | Datos actualizados del usuario del token | autenticado |
-
-### Usuarios (`/api/v1/usuarios`)
-
-| Método | Ruta | Descripción | Acceso |
-|---|---|---|---|
-| GET | `/` | Listar con filtros `rol`, `activo` | ADMIN |
-| GET | `/:id` | Detalle | ADMIN |
-| PATCH | `/:id/rol` | Cambiar rol (no permite modificar el rol propio) | ADMIN |
-| PATCH | `/:id/activacion` | Activar/desactivar (soft delete; no sobre sí mismo) | ADMIN |
-
-### Subestaciones (`/api/v1/subestaciones`)
-
-| Método | Ruta | Descripción | Acceso |
-|---|---|---|---|
-| GET | `/` | Listar con filtros `activa`, `tensionMin`, `tensionMax` | autenticado |
-| GET | `/:id` | Detalle | autenticado |
-| POST | `/` | Crear | ADMIN |
-| PUT | `/:id` | Editar | ADMIN |
-| PATCH | `/:id/activacion` | Activar/desactivar (soft delete) | ADMIN |
-
-### Activos (`/api/v1/activos`)
-
-| Método | Ruta | Descripción | Acceso |
-|---|---|---|---|
-| GET | `/` | Listar con filtros `subestacionId`, `tipo`, `estado`, `etiqueta`, `busqueda`, `inspeccionVencida` | autenticado |
-| GET | `/:id` | Detalle (con últimas 10 OTs y etiquetas asociadas) | autenticado |
-| POST | `/` | Crear (atómico: activo + OT INSTALACION en transacción) | TECNICO, ADMIN |
-| PUT | `/:id` | Editar `fabricante`, `modelo`, `numeroSerie` | TECNICO, ADMIN |
-| GET | `/:id/ordenes-trabajo` | Historial paginado completo del activo | autenticado |
-| POST | `/:id/ordenes-trabajo` | Registrar OT (aplica Reglas A y B; ver §7) | OPERARIO solo INSPECCION; TECNICO, ADMIN cualquier tipo |
-| POST | `/:id/etiquetas` | Asociar etiquetas al activo (semántica `set` total) | TECNICO, ADMIN |
-
-### Órdenes de trabajo (`/api/v1/ordenes-trabajo`)
-
-| Método | Ruta | Descripción | Acceso |
-|---|---|---|---|
-| GET | `/` | Listado global con filtros `tipo`, `autorId`, `activoId`, `fechaDesde`, `fechaHasta` | autenticado |
-
-Las OTs son inmutables: no hay PUT ni DELETE. Se crean anidadas bajo `/activos/:id/ordenes-trabajo`.
-
-### Etiquetas (`/api/v1/etiquetas`)
-
-| Método | Ruta | Descripción | Acceso |
-|---|---|---|---|
-| GET | `/` | Listar todas (con conteo de activos por etiqueta) | autenticado |
-| POST | `/` | Crear | TECNICO, ADMIN |
-| DELETE | `/:id` | Borrar (único hard delete del proyecto) | ADMIN |
-
-### Dashboard (`/api/v1/dashboard`)
-
-| Método | Ruta | Descripción | Acceso |
-|---|---|---|---|
-| GET | `/` | KPIs agregados: distribución por estado, inspecciones vencidas, top de activos, OTs últimos 30 días por tipo | autenticado |
-
-### Paginación
-
-Todos los listados aceptan `?pagina=N&limite=M` (defaults `1`/`20`, máximo `limite=100`). La respuesta tiene la forma:
-
-```json
-{
-  "datos": [ /* ... */ ],
-  "paginacion": {
-    "pagina": 1,
-    "limite": 20,
-    "total": 18,
-    "totalPaginas": 1
-  }
-}
+```
+backend/
+├── app.js                # Composición Express (montaje de routers + errorHandler)
+├── server.js             # Entry point (app.listen)
+├── features/
+│   ├── auth/             # registro, login, perfil
+│   ├── usuarios/         # CRUD admin-only
+│   ├── subestaciones/    # CRUD + activación con guardarraíl
+│   ├── activos/          # CRUD + OTs anidadas + etiquetas (núcleo del proyecto)
+│   ├── ordenes-trabajo/  # solo listado global (OTs inmutables)
+│   ├── etiquetas/        # CRUD + asociación N:M
+│   └── dashboard/        # KPIs agregados
+├── middleware/           # verificarToken, requireRol, validate, errorHandler
+├── lib/                  # prisma, transiciones, intervalos, webhook, errores, paginacion
+├── prisma/               # schema.prisma, migrations/, seed.js
+├── tests/                # 8 suites Vitest + helper limpiar-bd
+└── postman/              # colección y environment (E2E con Newman)
 ```
 
-## 7. Reglas de negocio
+Dentro de cada feature: `routes.js` (rutas + middleware) · `controller.js` (adaptador HTTP delgado) · `service.js` (lógica de negocio) · `schema.js` (validación Zod).
 
-### Regla A — Máquina de estados del Activo
+Los services son puros: reciben datos planos, devuelven datos planos, lanzan errores del dominio definidos en `lib/errores.js`. Sin `req`/`res`. Testeables sin Express.
 
-Función pura en `backend/lib/transiciones.js`. Aplicada **dentro de una transacción Prisma** al registrar una OT, junto con la creación de la propia OT y la actualización del activo. Si la celda está prohibida, se lanza `ReglaNegocio` y Prisma hace rollback.
+## Modelo de dominio
 
-Matriz `estado actual × tipo OT → estado nuevo` (❌ = transición no permitida):
+### Entidades
+
+- **Usuario** — id `cuid()`, `passwordHash` (nombre explícito, nunca `password`), `rol` enum, soft delete con flag `activo`.
+- **Subestacion** — código funcional (`SE-NORTE-220`), tensión nominal en kV, soft delete con flag `activa`.
+- **Activo** — código funcional con prefijo IEC 81346-2 (`T-`, `TT-`, `QA-`, `QB-`, `F-`, `C-`), `estado` enum, `fechaProximaInspeccion` **almacenada** (no calculada al vuelo: la usan Regla B, dashboard y filtros de listado).
+- **OrdenTrabajo (OT)** — **inmutable**: sin `updatedAt`, sin endpoints `PUT` ni `DELETE`. Lleva snapshot `estadoAnterior` / `estadoNuevo` para que el histórico sea autosuficiente aunque la lógica cambie en el futuro.
+- **Etiqueta** — único modelo con `Int autoincrement` (metadato interno, no recurso navegable). Relación N:M con Activo vía tabla join implícita.
+
+Todas las FKs declaran `onDelete: Restrict`, salvo las dos de la tabla join `_ActivosEtiquetas` (que son `CASCADE` para permitir el único hard delete del proyecto).
+
+### Roles
+
+| Rol | Puede |
+| --- | --- |
+| OPERARIO | Lectura completa. OTs **solo de tipo `INSPECCION`**. (Rol por defecto del registro público.) |
+| TECNICO | Lo anterior + crear/editar activos, asociar etiquetas, registrar OTs de cualquier tipo. |
+| ADMIN | Todo lo anterior + gestión de usuarios, subestaciones y borrado de etiquetas. |
+
+### Enums clave
+
+- **EstadoActivo**: `EN_SERVICIO`, `AVERIADO`, `FUERA_DE_SERVICIO` (≡ "en descargo" en jerga del sector eléctrico), `DADO_DE_BAJA`.
+- **TipoActivo**: `TRANSFORMADOR_POTENCIA`, `INTERRUPTOR_AUTOMATICO`, `SECCIONADOR`, `PARARRAYOS`, `TRANSFORMADOR_MEDIDA`, `BATERIA_CONDENSADORES`.
+- **TipoOrdenTrabajo**: `INSPECCION`, `PREVENTIVO`, `CORRECTIVO`, `INSTALACION`, `BAJA`.
+- **ResultadoInspeccion**: `CONFORME`, `NO_CONFORME` (terminología UNE-EN 13306 §4.4).
+
+## Endpoints
+
+Todo bajo `/api/v1`. Cabecera `Authorization: Bearer <token>` requerida salvo en registro y login. Los listados aceptan `?pagina=N&limite=M` (defaults 1/20, máximo 100) y devuelven `{ datos, paginacion: { pagina, limite, total, totalPaginas } }`.
+
+### Auth · `/auth`
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| POST | `/registro` | público (fuerza `rol=OPERARIO`, ignora cualquier `rol` enviado en body) |
+| POST | `/login` | público |
+| GET | `/perfil` | autenticado |
+
+### Usuarios · `/usuarios` (todo ADMIN)
+| Método | Ruta | Notas |
+| --- | --- | --- |
+| GET | `/` · `/:id` | filtros: `rol`, `activo` |
+| PATCH | `/:id/rol` | no permite modificar el rol propio |
+| PATCH | `/:id/activacion` | no permite desactivarse a uno mismo |
+
+### Subestaciones · `/subestaciones`
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| GET | `/` · `/:id` | autenticado · filtros: `activa`, `tensionMin`, `tensionMax` |
+| POST · PUT | `/` · `/:id` | ADMIN |
+| PATCH | `/:id/activacion` | ADMIN · bloquea desactivar si hay activos no `DADO_DE_BAJA` |
+
+### Activos · `/activos`
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| GET | `/` · `/:id` | autenticado · filtros: `subestacionId`, `tipo`, `estado`, `etiqueta`, `busqueda`, `inspeccionVencida` |
+| POST | `/` | TECNICO+ · crea activo + OT `INSTALACION` **atómicamente** |
+| PUT | `/:id` | TECNICO+ · edita `fabricante`, `modelo`, `numeroSerie` |
+| GET | `/:id/ordenes-trabajo` | autenticado · historial paginado |
+| POST | `/:id/ordenes-trabajo` | OPERARIO solo `INSPECCION` · TECNICO+ cualquier tipo · aplica Reglas A y B |
+| POST | `/:id/etiquetas` | TECNICO+ · semántica `set` (reemplazo total) |
+
+### Órdenes de trabajo · `/ordenes-trabajo`
+| Método | Ruta | Notas |
+| --- | --- | --- |
+| GET | `/` | autenticado · filtros: `tipo`, `autorId`, `activoId`, `fechaDesde`, `fechaHasta` |
+
+No hay POST/PUT/DELETE: las OTs nacen anidadas bajo activo y son **inmutables**.
+
+### Etiquetas · `/etiquetas`
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| GET | `/` | autenticado · incluye `_count` de activos por etiqueta |
+| POST | `/` | TECNICO+ |
+| DELETE | `/:id` | ADMIN · **único hard delete del proyecto** |
+
+### Dashboard · `/dashboard`
+| Método | Ruta | Devuelve |
+| --- | --- | --- |
+| GET | `/` | `activosPorEstado`, `inspeccionesVencidas`, `topInspeccionesAtrasadas`, `otsUltimos30DiasPorTipo`, `ultimasOrdenesTrabajo` |
+
+## Reglas de negocio
+
+El núcleo no trivial del proyecto. Ambas se aplican al registrar una OT en `POST /activos/:id/ordenes-trabajo`.
+
+### Regla A — Máquina de estados del activo
+
+Implementada como **función pura** en `lib/transiciones.js`. Se aplica **dentro de una transacción Prisma** junto con la creación de la OT, la actualización del activo y (si procede) el recálculo de `fechaProximaInspeccion`. Si la celda está prohibida, lanza `ReglaNegocio` (HTTP 422) y la transacción hace rollback.
 
 | Estado actual | INSPECCION | PREVENTIVO | CORRECTIVO | INSTALACION | BAJA |
-|---|---|---|---|---|---|
-| `EN_SERVICIO` | `CONFORME` → `EN_SERVICIO` · `NO_CONFORME` → `AVERIADO` | `FUERA_DE_SERVICIO` | `FUERA_DE_SERVICIO` | ❌ | `DADO_DE_BAJA` |
+| --- | --- | --- | --- | --- | --- |
+| `EN_SERVICIO` | CONFORME → `EN_SERVICIO` · NO_CONFORME → `AVERIADO` | `FUERA_DE_SERVICIO` | `FUERA_DE_SERVICIO` | ❌ | `DADO_DE_BAJA` |
 | `AVERIADO` | `AVERIADO` (no-op) | ❌ | `FUERA_DE_SERVICIO` | ❌ | `DADO_DE_BAJA` |
 | `FUERA_DE_SERVICIO` | `FUERA_DE_SERVICIO` (no-op) | ❌ | `EN_SERVICIO` | ❌ | `DADO_DE_BAJA` |
 | `DADO_DE_BAJA` | ❌ | ❌ | ❌ | `EN_SERVICIO` | ❌ |
 
-La INSPECCION sobre `EN_SERVICIO` es el único caso donde el resultado modifica la transición; en `AVERIADO` y `FUERA_DE_SERVICIO` es no-op pero el resultado sigue siendo obligatorio en el body.
+`INSPECCION` sobre `EN_SERVICIO` es el único caso donde el `resultado` modifica la transición. En `AVERIADO`/`FUERA_DE_SERVICIO` la inspección es no-op pero `resultado` sigue siendo obligatorio (una OT sin veredicto no tiene sentido auditable).
 
 ### Regla B — Bloqueo por inspección vencida
 
-Si `activo.fechaProximaInspeccion < hoy`, **no se permite registrar una OT de tipo `PREVENTIVO`**. El operario o técnico debe registrar antes una `INSPECCION` (que recalcula `fechaProximaInspeccion` al cerrar con `CONFORME`, usando el intervalo de `lib/intervalos-inspeccion.js` según el tipo de activo).
+Si `activo.fechaProximaInspeccion < hoy`, **no se permite registrar `PREVENTIVO`**. Hay que cerrar primero una `INSPECCION CONFORME`, que recalcula `fechaProximaInspeccion` usando el intervalo por tipo de activo (`lib/intervalos-inspeccion.js`):
+
+| Tipo | Intervalo |
+| --- | --- |
+| `SECCIONADOR` | 90 días |
+| `TRANSFORMADOR_POTENCIA` · `BATERIA_CONDENSADORES` | 180 días |
+| `INTERRUPTOR_AUTOMATICO` · `PARARRAYOS` · `TRANSFORMADOR_MEDIDA` | 365 días |
 
 Se evalúa **antes** de abrir la transacción: si bloquea, no se toca BD ni se dispara webhook.
 
-## 8. Tests
+## Decisiones de diseño
 
-Dos capas independientes:
+- **OT inmutable**. Sin `PUT` ni `DELETE`. Las correcciones se asientan como OTs nuevas. El histórico tiene valor auditable.
+- **Snapshot `estadoAnterior`/`estadoNuevo`** en cada OT. Si la matriz cambia en el futuro, las OTs antiguas siguen siendo legibles sin reproducir la lógica vigente.
+- **Atomicidad: crear activo + OT INSTALACION** ocurren en `prisma.$transaction`. No hay activos sin su OT de origen.
+- **Regla B fuera de la transacción, Regla A dentro**. Fail-fast antes de abrir BD; rollback automático si la transición es inválida.
+- **Webhook tras el commit, async sin `await`**. Disparado solo en eventos críticos (`ot.correctivo`, `ot.averia_detectada`). Si rollback hubiera, no se notifica. Si n8n falla, la OT sigue válida. `WEBHOOK_URL` vacía = no-op. Timeout de 5s con `AbortController`.
+- **Soft delete asimétrico**. `Usuario`/`Subestacion` con flag booleano. `Activo` mediante estado `DADO_DE_BAJA` (preserva FKs `onDelete: Restrict`). `Etiqueta` es el único hard delete del proyecto.
+- **`passwordHash` (no `password`)** como nombre de campo. Primera línea de defensa contra fugas. Helper `sinPasswordHash` + constante `CAMPOS_PUBLICOS` en cada query de usuario refuerzan el patrón.
+- **Mensajes de error genéricos en login**. "Credenciales incorrectas" para email inexistente, password incorrecta y usuario desactivado: evita enumeración.
+- **Autoprotección del ADMIN**. No puede modificar su propio rol ni desactivarse a sí mismo (`ReglaNegocio` 422).
+- **Desactivación de subestación bloqueada si hay activos vivos**. No dejar activos huérfanos en una sub apagada.
+- **IDs `cuid()` para entidades públicas**, `Int autoincrement` solo para `Etiqueta`. Evita enumeración de recursos en URLs.
+- **Aritmética de fechas en UTC** (`setUTCDate`). Evita derivas por zona horaria en el filtro de inspecciones vencidas alrededor del cambio de día.
+- **Dashboard rellena claves de enum con 0** cuando `groupBy` no devuelve datos para un grupo. Estabilidad para gráficos del frontend (no aparecen/desaparecen barras).
+- **Dashboard excluye `DADO_DE_BAJA`** de "inspecciones vencidas" y del top: un activo retirado no se inspecciona.
+- **Autorización híbrida en OTs**: rol + contenido del body. `OPERARIO` solo puede registrar `INSPECCION`; resto cualquier tipo. Middleware a medida en `features/activos/routes.js`.
+- **Prefijo `/api/v1/`** en todas las rutas. Preparado para versionado futuro.
 
-```bash
-# Suite Vitest + Supertest (unidad e integración contra el código).
-# Requiere PostgreSQL corriendo. Reutiliza la BD configurada en .env.
-npm test
-
-# Suite Newman (end-to-end contra la API en ejecución).
-# Requiere que el servidor esté arrancado y la BD sembrada con node prisma/seed.js.
-npm run test:api
-```
-
-Vitest cubre lógica de servicios, transiciones, paginación, autorización y validaciones. Newman ejecuta la colección Postman recorriendo flujos completos: logins, creación de subestación → activo → OT → etiqueta, y demos de denegación 403.
-
-## 9. Base normativa
-
-Términos y resultados del modelo se apoyan en normativa del sector:
-
-- **UNE-EN 13306** — *Terminología del mantenimiento*. Origen del término "activo", los tipos de mantenimiento (`PREVENTIVO`, `CORRECTIVO`, `INSPECCION`) y los resultados de inspección (`CONFORME`, `NO_CONFORME`, §4.4 Conformidad).
-- **IEC 81346-2** — *Sistemas industriales, instalaciones y equipos. Designación de referencia*. La codificación de `Activo.codigo` la sigue de forma pragmática:
-  - `T-` transformador de potencia
-  - `TT-` transformador de medida (variante de uso habitual en España)
-  - `QA-` interruptor automático
-  - `QB-` seccionador
-  - `F-` descargador de sobretensión (pararrayos)
-  - `C-` batería de condensadores
-- **UNE-EN 60099** — *Pararrayos. Descargadores de sobretensión*. Norma específica del tipo `PARARRAYOS`; en el enum se conserva el término coloquial por reconocibilidad, sin perjuicio de la designación normativa.
-
-## 10. Decisiones de diseño destacables
-
-- **Arquitectura feature-based con capa de servicios.** Cada dominio se aísla en su carpeta con `routes/controller/service/schema`; la lógica de negocio vive en los services, los controllers son adaptadores HTTP delgados.
-- **OrdenTrabajo inmutable** (sin `PUT` ni `DELETE`, sin `updatedAt`). El histórico de mantenimiento tiene valor auditable; las correcciones se asientan como nuevas OTs.
-- **Snapshot `estadoAnterior`/`estadoNuevo` en cada OT.** El histórico es autosuficiente: aunque la matriz de transiciones cambie en el futuro, las OTs antiguas siguen siendo consultables sin re-ejecutar la lógica vigente.
-- **Soft delete en `Usuario` y `Subestacion`** (campo `activo`/`activa`), **baja por OT en `Activo`** (estado `DADO_DE_BAJA`). Preserva la integridad referencial del histórico (`onDelete: Restrict` en todas las FKs).
-- **Webhook a n8n** en eventos `ot.correctivo` y `ot.averia_detectada`, no email directo. Desacopla el canal de notificación y permite cambiar destino/formato sin tocar el backend.
-- **IDs `cuid()` para entidades públicas, `Int autoincrement` solo para `Etiqueta`.** Evita enumeración de recursos en URLs; la etiqueta es metadato interno sin valor histórico.
-- **Prefijo `/api/v1/`** en todas las rutas. Preparación para versionado futuro sin migración traumática.
-
-## 11. Colección Postman
-
-Los dos JSON viven en `backend/postman/`:
-
-- `gestion-subestaciones.postman_collection.json` — colección v2.1 con las 24 peticiones organizadas en 7 carpetas, más 3 peticiones `[demo 403]` para demostrar el modelo de autorización.
-- `gestion-subestaciones.postman_environment.json` — environment con `baseUrl` y las variables dinámicas (`tokenAdmin`, `tokenTecnico`, `tokenOperario`, `subestacionId`, `activoId`, `usuarioId`, `etiquetaId`) que la colección rellena sola al ejecutarse.
-
-**Importar en Postman Desktop:** `File → Import` → seleccionar los dos JSON → seleccionar el environment arriba a la derecha → ejecutar con Collection Runner.
-
-**Ejecutar con Newman:**
+## Tests
 
 ```bash
-npm run test:api
+npm test           # Vitest + Supertest (unidad e integración contra BD)
+npm run test:api   # Newman contra API en ejecución (E2E)
 ```
 
-La colección es idempotente: los códigos de subestación, códigos y números de serie de activo, nombres de etiqueta y email del registro se generan con sufijo `Date.now()` en prerequest-scripts, de modo que pueda ejecutarse N veces sin chocar con `@unique` de Prisma.
+**8 suites Vitest**: `auth`, `usuarios`, `subestaciones`, `activos`, `ordenes-trabajo`, `etiquetas`, `dashboard` y `transiciones` (esta última testea la función pura sin BD). Cada suite se autoabastece de fixtures en `beforeAll` y limpia con el helper compartido `tests/lib/limpiar-bd.js`. El webhook se mockea con `vi.mock` para verificar llamadas sin tocar n8n.
 
-## 12. Ampliaciones futuras
+**Newman** ejecuta la colección Postman contra la API real. Los códigos únicos se generan con `Date.now()` en pre-request scripts → la colección es **idempotente** y se puede ejecutar N veces sin chocar con los `@unique` de Prisma.
 
-Quedan explícitamente fuera del alcance actual y son extensiones naturales para próximas iteraciones:
+> Los tests Vitest limpian la BD. Si quieres usar la API después de ejecutarlos, vuelve a correr `node prisma/seed.js`.
 
-- Cron que genere automáticamente OTs de mantenimiento preventivo a partir de `fechaProximaInspeccion`.
-- Ciclo de vida ampliado de la OT (estados `PENDIENTE` / `EN_CURSO` / `CERRADA`) en lugar del modelo inmutable actual.
+## Postman
+
+Importar los dos JSON de `backend/postman/` en Postman Desktop y seleccionar el environment `gestion-subestaciones (local)`. Carpetas de la colección:
+
+- **★ DEMO 4min** — 11 requests numeradas que recorren un ciclo de avería completo: login admin → crear activo → `INSPECCION NO_CONFORME` → `CORRECTIVO` → `CORRECTIVO` → cambio a operario → demo 403 → etiquetas → dashboard. Los nombres declaran la transición esperada (ej. `[EN_SERVICIO → AVERIADO]`) y los test scripts la verifican.
+- **Auth · Subestaciones · Activos · Órdenes de Trabajo · Etiquetas · Usuarios · Dashboard** — cobertura por feature.
+- **Peticiones `[demo 403]`** — tres requests específicas que demuestran el modelo de autorización: operario intentando crear subestación, operario intentando `PREVENTIVO`, técnico intentando borrar etiqueta.
+
+Las requests guardan en el environment las variables que las siguientes necesitan (`tokenAdmin`, `subestacionId`, `activoId`, `etiquetaId`...), así que **basta con ejecutar la colección en orden con el Runner**.
+
+Ver [`DEMO.md`](DEMO.md) para el guion paso a paso de la demo de 4 minutos.
+
+## Base normativa
+
+El modelo se apoya en normativa real del sector:
+
+- **UNE-EN 13306** — Terminología del mantenimiento. Origen de los tipos `PREVENTIVO` / `CORRECTIVO` / `INSPECCION` y de los resultados `CONFORME` / `NO_CONFORME` (§4.4 Conformidad).
+- **IEC 81346-2** — Designación de referencia. Prefijos del `Activo.codigo`:
+  - `T-` transformador de potencia · `TT-` transformador de medida (uso habitual en España)
+  - `QA-` interruptor automático · `QB-` seccionador
+  - `F-` descargador de sobretensión (pararrayos) · `C-` batería de condensadores
+- **UNE-EN 60099** — Pararrayos. El enum mantiene "PARARRAYOS" por reconocibilidad sobre la designación normativa "descargador de sobretensión".
+
+## Roadmap
+
+Fuera del scope actual; extensiones naturales para próximas iteraciones:
+
+- Cron de generación automática de `PREVENTIVO`s a partir de `fechaProximaInspeccion`.
+- Ciclo de vida ampliado de la OT (estados `PENDIENTE` / `EN_CURSO` / `CERRADA`) en lugar del modelo inmutable.
 - Jerarquía de ubicaciones: `Subestacion → Bahía → Posición → Activo`.
 - Adjuntos en OTs (fotos de campo, PDFs de informes).
 - Refresh tokens y revocación granular de JWT.
-- Búsqueda full-text sobre activos y OTs con `tsvector` de PostgreSQL.
+- Búsqueda full-text sobre activos y OTs con `tsvector`.
 - Frontend React consumiendo esta API.
-- Despliegue automatizado (CI/CD, contenedor del backend, BD gestionada).
+- CI/CD con despliegue automatizado del backend y BD gestionada.
